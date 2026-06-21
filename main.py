@@ -1,6 +1,10 @@
-from app.ui import main_ui
-from PySide6 import QtWidgets 
+import os
 import sys
+# Enable MPS fallback for PyTorch ops not yet implemented on Apple Silicon
+os.environ.setdefault('PYTORCH_ENABLE_MPS_FALLBACK', '1')
+
+from app.ui import main_ui
+from PySide6 import QtWidgets
 
 import qdarktheme
 from app.ui.core.proxy_style import ProxyStyle

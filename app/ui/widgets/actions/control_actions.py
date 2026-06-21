@@ -21,7 +21,11 @@ def change_execution_provider(main_window: 'MainWindow', new_provider):
 
 def change_threads_number(main_window: 'MainWindow', new_threads_number):
     main_window.video_processor.set_number_of_threads(new_threads_number)
-    torch.cuda.empty_cache()
+    device = main_window.models_processor.device
+    if device == 'cuda':
+        torch.cuda.empty_cache()
+    elif device == 'mps':
+        torch.mps.empty_cache()
     common_widget_actions.update_gpu_memory_progressbar(main_window)
 
 

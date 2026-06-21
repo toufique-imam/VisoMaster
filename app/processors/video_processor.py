@@ -11,7 +11,12 @@ from functools import partial
 import cv2
 import numpy
 import torch
-import pyvirtualcam
+try:
+    import pyvirtualcam
+    _PYVIRTUALCAM_AVAILABLE = True
+except ImportError:
+    pyvirtualcam = None
+    _PYVIRTUALCAM_AVAILABLE = False
 
 from PySide6.QtCore import QObject, QTimer, Signal, Slot
 from PySide6.QtGui import QPixmap
@@ -99,7 +104,10 @@ class VideoProcessor(QObject):
         else:
             graphics_view_actions.update_graphics_view(self.main_window, pixmap, frame_number,)
         self.current_frame = frame
-        torch.cuda.empty_cache()
+        if self.main_window.models_processor.device == 'cuda':
+            torch.cuda.empty_cache()
+        elif self.main_window.models_processor.device == 'mps':
+            torch.mps.empty_cache()
         #Set GPU Memory Progressbar
         common_widget_actions.update_gpu_memory_progressbar(self.main_window)
     def display_next_frame(self):
@@ -382,7 +390,10 @@ class VideoProcessor(QObject):
             self.recording = False #Set recording as False to make sure the next process_video() call doesnt not record the video, unless the user press the record button
 
             print("Clearing Cache")
-            torch.cuda.empty_cache()
+            if self.main_window.models_processor.device == 'cuda':
+                torch.cuda.empty_cache()
+            elif self.main_window.models_processor.device == 'mps':
+                torch.mps.empty_cache()
             gc.collect()
             video_control_actions.reset_media_buttons(self.main_window)
             print("Successfully Stopped Processing")

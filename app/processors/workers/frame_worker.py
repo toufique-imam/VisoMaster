@@ -456,7 +456,7 @@ class FrameWorker(threading.Thread):
                             input_face_disc = input_face_disc.permute(2, 0, 1)
                             input_face_disc = torch.unsqueeze(input_face_disc, 0).contiguous()
 
-                            swapper_output = torch.empty((1,3,128,128), dtype=torch.float32, device=self.models_processor.device).contiguous()
+                            swapper_output = torch.empty((1,3,128,128), dtype=torch.float32, device=self.models_processor.ort_device).contiguous()
                             self.models_processor.run_inswapper(input_face_disc, latent, swapper_output)
 
                             swapper_output = torch.squeeze(swapper_output)
@@ -475,7 +475,7 @@ class FrameWorker(threading.Thread):
                     input_face_disc = input_face_affined.permute(2, 0, 1)
                     input_face_disc = torch.unsqueeze(input_face_disc, 0).contiguous()
 
-                    swapper_output = torch.empty((1,3,256,256), dtype=torch.float32, device=self.models_processor.device).contiguous()
+                    swapper_output = torch.empty((1,3,256,256), dtype=torch.float32, device=self.models_processor.ort_device).contiguous()
                     self.models_processor.run_iss_swapper(input_face_disc, latent, swapper_output, version)
 
                     swapper_output = torch.squeeze(swapper_output)
@@ -491,7 +491,7 @@ class FrameWorker(threading.Thread):
             for k in range(itex):
                 input_face_disc = input_face_affined.permute(2, 0, 1)
                 input_face_disc = torch.unsqueeze(input_face_disc, 0).contiguous()
-                swapper_output = torch.empty((1,3,512,512), dtype=torch.float32, device=self.models_processor.device).contiguous()
+                swapper_output = torch.empty((1,3,512,512), dtype=torch.float32, device=self.models_processor.ort_device).contiguous()
                 self.models_processor.run_swapper_simswap512(input_face_disc, latent, swapper_output)
                 swapper_output = torch.squeeze(swapper_output)
                 swapper_output = swapper_output.permute(1, 2, 0)
@@ -509,7 +509,7 @@ class FrameWorker(threading.Thread):
                 input_face_disc = torch.sub(input_face_disc, 1)
                 #input_face_disc = input_face_disc[[2, 1, 0], :, :] # Inverte i canali da BGR a RGB (assumendo che l'input sia BGR)
                 input_face_disc = torch.unsqueeze(input_face_disc, 0).contiguous()
-                swapper_output = torch.empty((1,3,256,256), dtype=torch.float32, device=self.models_processor.device).contiguous()
+                swapper_output = torch.empty((1,3,256,256), dtype=torch.float32, device=self.models_processor.ort_device).contiguous()
                 self.models_processor.run_swapper_ghostface(input_face_disc, latent, swapper_output, swapper_model)
                 swapper_output = swapper_output[0]
                 swapper_output = swapper_output.permute(1, 2, 0)
@@ -528,7 +528,7 @@ class FrameWorker(threading.Thread):
                 input_face_disc = input_face_affined.permute(2, 0, 1)
                 input_face_disc = v2.functional.normalize(input_face_disc, (0.5, 0.5, 0.5), (0.5, 0.5, 0.5), inplace=False)
                 input_face_disc = torch.unsqueeze(input_face_disc, 0).contiguous()
-                swapper_output = torch.empty((1,3,256,256), dtype=torch.float32, device=self.models_processor.device).contiguous()
+                swapper_output = torch.empty((1,3,256,256), dtype=torch.float32, device=self.models_processor.ort_device).contiguous()
                 self.models_processor.run_swapper_cscs(input_face_disc, latent, swapper_output)
                 swapper_output = torch.squeeze(swapper_output)
                 swapper_output = torch.add(torch.mul(swapper_output, 0.5), 0.5)
@@ -552,7 +552,7 @@ class FrameWorker(threading.Thread):
     
     def get_border_mask(self, parameters):
         # Create border mask
-        border_mask = torch.ones((128, 128), dtype=torch.float32, device=self.models_processor.device)
+        border_mask = torch.ones((128, 128), dtype=torch.float32, device=self.models_processor.ort_device)
         border_mask = torch.unsqueeze(border_mask,0)
 
         # if parameters['BorderState']:
@@ -598,7 +598,7 @@ class FrameWorker(threading.Thread):
 
             # Create empty output image and preprocess it for swapping
             output_size = int(128 * dim)
-            output = torch.zeros((output_size, output_size, 3), dtype=torch.float32, device=self.models_processor.device)
+            output = torch.zeros((output_size, output_size, 3), dtype=torch.float32, device=self.models_processor.ort_device)
             input_face_affined = input_face_affined.permute(1, 2, 0)
             input_face_affined = torch.div(input_face_affined, 255.0)
 
@@ -631,7 +631,7 @@ class FrameWorker(threading.Thread):
         border_mask = self.get_border_mask(parameters)
 
         # Create image mask
-        swap_mask = torch.ones((128, 128), dtype=torch.float32, device=self.models_processor.device)
+        swap_mask = torch.ones((128, 128), dtype=torch.float32, device=self.models_processor.ort_device)
         swap_mask = torch.unsqueeze(swap_mask,0)
         
         # Expression Restorer
@@ -679,8 +679,8 @@ class FrameWorker(threading.Thread):
             homogeneous_kps = np.hstack([kps_5, ones_column])
             dst_kps_5 = np.dot(homogeneous_kps, M.T)
 
-            img_swap_mask = torch.ones((1, 512, 512), dtype=torch.float32, device=self.models_processor.device).contiguous()
-            img_orig_mask = torch.zeros((1, 512, 512), dtype=torch.float32, device=self.models_processor.device).contiguous()
+            img_swap_mask = torch.ones((1, 512, 512), dtype=torch.float32, device=self.models_processor.ort_device).contiguous()
+            img_orig_mask = torch.zeros((1, 512, 512), dtype=torch.float32, device=self.models_processor.ort_device).contiguous()
 
             if parameters['RestoreMouthEnableToggle']:
                 img_swap_mask = self.models_processor.restore_mouth(img_orig_mask, img_swap_mask, dst_kps_5, parameters['RestoreMouthBlendAmountSlider']/100, parameters['RestoreMouthFeatherBlendSlider'], parameters['RestoreMouthSizeFactorSlider']/100, parameters['RestoreXMouthRadiusFactorDecimalSlider'], parameters['RestoreYMouthRadiusFactorDecimalSlider'], parameters['RestoreXMouthOffsetSlider'], parameters['RestoreYMouthOffsetSlider'])
@@ -724,7 +724,7 @@ class FrameWorker(threading.Thread):
             swap = torch.squeeze(swap)
             swap = swap.permute(1, 2, 0).type(torch.float32)
 
-            del_color = torch.tensor([parameters['ColorRedSlider'], parameters['ColorGreenSlider'], parameters['ColorBlueSlider']], device=self.models_processor.device)
+            del_color = torch.tensor([parameters['ColorRedSlider'], parameters['ColorGreenSlider'], parameters['ColorBlueSlider']], device=self.models_processor.ort_device)
             swap += del_color
             swap = torch.clamp(swap, min=0., max=255.)
             swap = swap.permute(2, 0, 1).type(torch.uint8)
@@ -737,7 +737,7 @@ class FrameWorker(threading.Thread):
 
             if parameters['ColorNoiseDecimalSlider'] > 0:
                 swap = swap.permute(1, 2, 0).type(torch.float32)
-                swap = swap + parameters['ColorNoiseDecimalSlider']*torch.randn(512, 512, 3, device=self.models_processor.device)
+                swap = swap + parameters['ColorNoiseDecimalSlider']*torch.randn(512, 512, 3, device=self.models_processor.ort_device)
                 swap = torch.clamp(swap, 0, 255)
                 swap = swap.permute(2, 0, 1)
 
@@ -875,7 +875,7 @@ class FrameWorker(threading.Thread):
                 image = image.type(torch.float32)
                 image = torch.unsqueeze(image, 0).contiguous()
 
-                output = torch.empty((image.shape), dtype=torch.float32, device=self.models_processor.device).contiguous()
+                output = torch.empty((image.shape), dtype=torch.float32, device=self.models_processor.ort_device).contiguous()
 
                 match enhancer_type:
                     case 'DeOldify-Artistic':
@@ -944,7 +944,7 @@ class FrameWorker(threading.Thread):
                 tensor_gray_rgb = torch.unsqueeze(img_gray_rgb.type(torch.float32), 0).contiguous()
 
                 # Prepara il tensore per il modello
-                output_ab = torch.empty((1, 2, render_factor, render_factor), dtype=torch.float32, device=self.models_processor.device)
+                output_ab = torch.empty((1, 2, render_factor, render_factor), dtype=torch.float32, device=self.models_processor.ort_device)
 
                 # Esegui il modello
                 match enhancer_type:
@@ -1047,7 +1047,7 @@ class FrameWorker(threading.Thread):
         # let lip-open scalar to be 0 at first
         if flag_normalize_lip and flag_relative_motion and source_lmk is not None:
             c_d_lip_before_animation = [0.]
-            combined_lip_ratio_tensor_before_animation = faceutil.calc_combined_lip_ratio(c_d_lip_before_animation, source_lmk, device=self.models_processor.device)
+            combined_lip_ratio_tensor_before_animation = faceutil.calc_combined_lip_ratio(c_d_lip_before_animation, source_lmk, device=self.models_processor.ort_device)
             if combined_lip_ratio_tensor_before_animation[0][0] >= lip_normalize_threshold:
                 lip_delta_before_animation = self.models_processor.lp_retarget_lip(x_s, combined_lip_ratio_tensor_before_animation)
 
@@ -1062,11 +1062,11 @@ class FrameWorker(threading.Thread):
             else:
                 R_new = R_s
             if animation_region == "all" or animation_region == "exp":
-                delta_new = x_s_info['exp'] + (x_d_i_info['exp'] - torch.from_numpy(self.models_processor.lp_lip_array).to(dtype=torch.float32, device=self.models_processor.device))
+                delta_new = x_s_info['exp'] + (x_d_i_info['exp'] - torch.from_numpy(self.models_processor.lp_lip_array).to(dtype=torch.float32, device=self.models_processor.ort_device))
             else:
                 if "lips" in animation_region:
                     for lip_idx in [6, 12, 14, 17, 19, 20]:
-                        delta_new[:, lip_idx, :] = (x_s_info['exp'] + (x_d_i_info['exp'] - torch.from_numpy(self.models_processor.lp_lip_array).to(dtype=torch.float32, device=self.models_processor.device)))[:, lip_idx, :]
+                        delta_new[:, lip_idx, :] = (x_s_info['exp'] + (x_d_i_info['exp'] - torch.from_numpy(self.models_processor.lp_lip_array).to(dtype=torch.float32, device=self.models_processor.ort_device)))[:, lip_idx, :]
 
                 if "eyes" in animation_region:
                     for eyes_idx in [11, 13, 15, 16, 18]:
@@ -1074,7 +1074,7 @@ class FrameWorker(threading.Thread):
             '''
             elif animation_region == "lips":
                 for lip_idx in [6, 12, 14, 17, 19, 20]:
-                    delta_new[:, lip_idx, :] = (x_s_info['exp'] + (x_d_i_info['exp'] - torch.from_numpy(self.models_processor.lp_lip_array).to(dtype=torch.float32, device=self.models_processor.device)))[:, lip_idx, :]
+                    delta_new[:, lip_idx, :] = (x_s_info['exp'] + (x_d_i_info['exp'] - torch.from_numpy(self.models_processor.lp_lip_array).to(dtype=torch.float32, device=self.models_processor.ort_device)))[:, lip_idx, :]
             elif animation_region == "eyes":
                 for eyes_idx in [11, 13, 15, 16, 18]:
                     delta_new[:, eyes_idx, :] = (x_s_info['exp'] + (x_d_i_info['exp'] - 0))[:, eyes_idx, :]
@@ -1142,14 +1142,14 @@ class FrameWorker(threading.Thread):
             eyes_delta, lip_delta = None, None
             if flag_eye_retargeting and source_lmk is not None:
                 c_d_eyes_i = c_d_eyes_lst
-                combined_eye_ratio_tensor = faceutil.calc_combined_eye_ratio(c_d_eyes_i, source_lmk, device=self.models_processor.device)
+                combined_eye_ratio_tensor = faceutil.calc_combined_eye_ratio(c_d_eyes_i, source_lmk, device=self.models_processor.ort_device)
                 combined_eye_ratio_tensor = combined_eye_ratio_tensor * eye_retargeting_multiplier
                 # ∆_eyes,i = R_eyes(x_s; c_s,eyes, c_d,eyes,i)                
                 eyes_delta = self.models_processor.lp_retarget_eye(x_s, combined_eye_ratio_tensor, parameters["FaceEditorTypeSelection"])
 
             if flag_lip_retargeting and source_lmk is not None:
                 c_d_lip_i = c_d_lip_lst
-                combined_lip_ratio_tensor = faceutil.calc_combined_lip_ratio(c_d_lip_i, source_lmk, device=self.models_processor.device)
+                combined_lip_ratio_tensor = faceutil.calc_combined_lip_ratio(c_d_lip_i, source_lmk, device=self.models_processor.ort_device)
                 combined_lip_ratio_tensor = combined_lip_ratio_tensor * lip_retargeting_multiplier
                 # ∆_lip,i = R_lip(x_s; c_s,lip, c_d,lip,i)
                 lip_delta = self.models_processor.lp_retarget_lip(x_s, combined_lip_ratio_tensor, parameters["FaceEditorTypeSelection"])
@@ -1266,12 +1266,12 @@ class FrameWorker(threading.Thread):
 
             input_eye_ratio = max(min(init_source_eye_ratio + parameters['EyesOpenRatioDecimalSlider'], 0.80), 0.00)
             if input_eye_ratio != init_source_eye_ratio:
-                combined_eye_ratio_tensor = faceutil.calc_combined_eye_ratio([[float(input_eye_ratio)]], lmk_crop, device=self.models_processor.device)
+                combined_eye_ratio_tensor = faceutil.calc_combined_eye_ratio([[float(input_eye_ratio)]], lmk_crop, device=self.models_processor.ort_device)
                 eyes_delta = self.models_processor.lp_retarget_eye(x_s_user, combined_eye_ratio_tensor, parameters["FaceEditorTypeSelection"])
 
             input_lip_ratio = max(min(init_source_lip_ratio + parameters['LipsOpenRatioDecimalSlider'], 0.80), 0.00)
             if input_lip_ratio != init_source_lip_ratio:
-                combined_lip_ratio_tensor = faceutil.calc_combined_lip_ratio([[float(input_lip_ratio)]], lmk_crop, device=self.models_processor.device)
+                combined_lip_ratio_tensor = faceutil.calc_combined_lip_ratio([[float(input_lip_ratio)]], lmk_crop, device=self.models_processor.ort_device)
                 lip_delta = self.models_processor.lp_retarget_lip(x_s_user, combined_lip_ratio_tensor, parameters["FaceEditorTypeSelection"])
 
             x_d_new = x_d_new + \

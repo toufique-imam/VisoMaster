@@ -44,10 +44,17 @@ class ModelsProcessor(QtCore.QObject):
     processing_complete = QtCore.Signal()
     model_loaded = QtCore.Signal()  # Signal emitted with Onnx InferenceSession
 
-    def __init__(self, main_window: 'MainWindow', device='cuda'):
+    def __init__(self, main_window: 'MainWindow', device=None):
         super().__init__()
         self.main_window = main_window
         self.provider_name = 'TensorRT'
+        if device is None:
+            if torch.cuda.is_available():
+                device = 'cuda'
+            elif torch.backends.mps.is_available():
+                device = 'mps'
+            else:
+                device = 'cpu'
         self.device = device
         self.model_lock = threading.RLock()  # Reentrant lock for model access
         self.trt_ep_options = {
@@ -61,12 +68,16 @@ class ModelsProcessor(QtCore.QObject):
             'trt_layer_norm_fp32_fallback': True,
             'trt_builder_optimization_level': 5,
         }
-        self.providers = [
-            ('CUDAExecutionProvider'),
-            ('CPUExecutionProvider')
-        ]       
+        if self.device == 'cuda':
+            self.providers = [
+                ('CUDAExecutionProvider'),
+                ('CPUExecutionProvider')
+            ]
+        else:
+            self.providers = [('CPUExecutionProvider')]
         self.nThreads = 2
-        self.syncvec = torch.empty((1, 1), dtype=torch.float32, device=self.device)
+        # syncvec must live on CPU so it can be used as a sync barrier for onnxruntime
+        self.syncvec = torch.empty((1, 1), dtype=torch.float32, device='cpu')
 
         # Initialize models and models_path
         self.models: Dict[str, onnxruntime.InferenceSession] = {}
@@ -121,6 +132,20 @@ class ModelsProcessor(QtCore.QObject):
         
         self.lp_mask_crop = self.face_editors.lp_mask_crop
         self.lp_lip_array = self.face_editors.lp_lip_array
+
+    @property
+    def ort_device(self):
+        """Device string for onnxruntime io_binding — MPS is not supported so falls back to cpu."""
+        return 'cpu' if self.device == 'mps' else self.device
+
+    def synchronize(self):
+        """Synchronize the current device before onnxruntime io_binding."""
+        if self.device == 'cuda':
+            torch.cuda.synchronize()
+        elif self.device == 'mps':
+            torch.mps.synchronize()
+        else:
+            self.syncvec.cpu()
 
     def load_model(self, model_name, session_options=None):
         with self.model_lock:
@@ -241,6 +266,9 @@ class ModelsProcessor(QtCore.QObject):
                                 ('CPUExecutionProvider')
                             ]
                 self.device = 'cuda'
+            case "MPS":
+                providers = [('CPUExecutionProvider')]
+                self.device = 'mps'
             #case _:
 
         self.providers = providers
@@ -254,23 +282,30 @@ class ModelsProcessor(QtCore.QObject):
         self.delete_models_trt()
 
     def get_gpu_memory(self):
-        command = "nvidia-smi --query-gpu=memory.total --format=csv"
-        memory_total_info = sp.check_output(command.split()).decode('ascii').split('\n')[:-1][1:]
-        memory_total = [int(x.split()[0]) for i, x in enumerate(memory_total_info)]
+        if self.device != 'cuda':
+            return 0, 0
+        try:
+            command = "nvidia-smi --query-gpu=memory.total --format=csv"
+            memory_total_info = sp.check_output(command.split()).decode('ascii').split('\n')[:-1][1:]
+            memory_total = [int(x.split()[0]) for i, x in enumerate(memory_total_info)]
 
-        command = "nvidia-smi --query-gpu=memory.free --format=csv"
-        memory_free_info = sp.check_output(command.split()).decode('ascii').split('\n')[:-1][1:]
-        memory_free = [int(x.split()[0]) for i, x in enumerate(memory_free_info)]
+            command = "nvidia-smi --query-gpu=memory.free --format=csv"
+            memory_free_info = sp.check_output(command.split()).decode('ascii').split('\n')[:-1][1:]
+            memory_free = [int(x.split()[0]) for i, x in enumerate(memory_free_info)]
 
-        memory_used = memory_total[0] - memory_free[0]
-
-        return memory_used, memory_total[0]
+            memory_used = memory_total[0] - memory_free[0]
+            return memory_used, memory_total[0]
+        except Exception:
+            return 0, 0
     
     def clear_gpu_memory(self):
         self.delete_models()
         self.delete_models_dfm()
         self.delete_models_trt()
-        torch.cuda.empty_cache()
+        if self.device == 'cuda':
+            torch.cuda.empty_cache()
+        elif self.device == 'mps':
+            torch.mps.empty_cache()
 
 
     def load_inswapper_iss_emap(self, model_name):

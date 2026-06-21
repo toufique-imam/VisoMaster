@@ -248,6 +248,11 @@ def _update_gpu_memory_progressbar(main_window: 'MainWindow'):
 
 @QtCore.Slot(int, int)
 def set_gpu_memory_progressbar_value(main_window: 'MainWindow', memory_used, memory_total):
+    if memory_total == 0:
+        main_window.vramProgressBar.setMaximum(1)
+        main_window.vramProgressBar.setValue(0)
+        main_window.vramProgressBar.setFormat('N/A')
+        return
     main_window.vramProgressBar.setMaximum(memory_total)
     main_window.vramProgressBar.setValue(memory_used)
     main_window.vramProgressBar.setFormat(f'{round(memory_used/1024,2)} GB / {round(memory_total/1024,2)} GB (%p%)')
